@@ -20,9 +20,9 @@ node index.js
 Paste your numbers (one per line) in any format:
 
 ```
-+91 93534 66456
-+91 93548 23599
-+91 93598 59985
++91 1234567890
++91 1234567899
++91 1234567898
 ```
 
 Press Enter on an empty line to start sending.
