@@ -195,7 +195,7 @@ React if you'd like to contribute!`,
 // CONFIG
 // ─────────────────────────────────────────────
 const MAX_NUMBERS = 45;
-const DELAY_BETWEEN_MS = [6000, 14000];
+const DELAY_BETWEEN_MS = [300000, 600000]; // 5min to 10min
 // ─────────────────────────────────────────────
 
 function sleep(ms) {
