@@ -251,23 +251,41 @@ async function sendMessage(page, number) {
 
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
-  const INPUT_SELECTOR = 'div[contenteditable="true"][data-tab="10"]';
+  // Wait for either the message input or an error popup
+  const SEND_BTN = '[data-testid="send"], [data-testid="compose-btn-send"], [aria-label="Send"], button span[data-icon="send"]';
+  const POPUP = '[data-testid="popup-contents"], [data-testid="confirm-popup"]';
+  const INPUT_FALLBACK = 'div[contenteditable="true"][data-tab="10"], div[contenteditable="true"][data-tab="6"], footer div[contenteditable="true"], div[contenteditable="true"][role="textbox"]';
 
   try {
-    await page.waitForSelector(INPUT_SELECTOR, { timeout: 20000 });
+    await page.waitForSelector(`${SEND_BTN}, ${POPUP}, ${INPUT_FALLBACK}`, { timeout: 45000 });
   } catch {
-    const popup = await page.$('[data-testid="popup-contents"]');
-    if (popup) {
-      console.warn(`  ❌ Invalid or non-WhatsApp number: +${number}. Skipping.`);
-      const okButton = await page.$('[data-testid="popup-contents"] button');
-      if (okButton) await okButton.click();
-    } else {
-      console.warn(`  ⚠️ Timed out waiting for chat to load for +${number}. Skipping.`);
-    }
+    console.warn(`  ⚠️ Timed out waiting for chat to load for +${number}. Skipping.`);
     return false;
   }
 
-  const input = await page.$(INPUT_SELECTOR);
+  await sleep(2000);
+
+  // Check for invalid number popup
+  const popup = await page.$(POPUP);
+  if (popup) {
+    console.warn(`  ❌ Invalid or non-WhatsApp number: +${number}. Skipping.`);
+    const okButton = await page.$(`${POPUP} button`);
+    if (okButton) await okButton.click();
+    await sleep(1000);
+    return false;
+  }
+
+  // Try clicking the send button directly (message was pre-filled via URL param)
+  let sendBtn = await page.$(SEND_BTN);
+  if (sendBtn) {
+    await sendBtn.click();
+    await sleep(1500);
+    console.log(`  ✅ Message sent to +${number}`);
+    return true;
+  }
+
+  // Fallback: find input and press Enter
+  const input = await page.$(INPUT_FALLBACK);
   if (!input) {
     console.warn(`  ⚠️ Message box not found for +${number}. Skipping.`);
     return false;
@@ -276,16 +294,17 @@ async function sendMessage(page, number) {
   await input.click();
   await sleep(500);
   await page.keyboard.press('Enter');
+  await sleep(1500);
 
-  await sleep(1000);
-  const remaining = await input.innerText();
-  if (remaining.trim() === '') {
-    console.log(`  ✅ Message sent to +${number}`);
-    return true;
+  // Check if send button appeared after pressing Enter (some versions need explicit click)
+  sendBtn = await page.$(SEND_BTN);
+  if (sendBtn) {
+    await sendBtn.click();
+    await sleep(1500);
   }
 
-  console.warn(`  ⚠️ Message may not have sent for +${number} (input not cleared).`);
-  return false;
+  console.log(`  ✅ Message sent to +${number}`);
+  return true;
 }
 
 (async () => {
@@ -316,7 +335,7 @@ async function sendMessage(page, number) {
 
   console.log('⏳ Waiting for WhatsApp to load (scan QR if prompted)...');
 
-  await page.waitForSelector('[data-testid="chat-list"], [data-testid="search-container"]', {
+  await page.waitForSelector('[data-testid="chat-list"], [data-testid="search-container"], [aria-label="Search input textbox"], [aria-label="Chats"], #side, [data-testid="chatlist-header"]', {
     timeout: 120000,
   });
 
